@@ -8,8 +8,10 @@ edges = cv2.Canny(img2, 50, 150, apertureSize=3)
 lines = cv2.HoughLines(edges, 1, np.pi/180, 160)
 lines1 = lines[:, 0, :]
 result = img2.copy()
+houghlines = []; # 存储检测出的垂直线
 for rho, theta in lines1[:]:
     if (theta < (np.pi/9.0)) or (theta > (17*np.pi/9.0)):
+        houghlines.append([rho, theta])
         a = np.cos(theta)
         b = np.sin(theta)
         x0 = a * rho
@@ -19,5 +21,6 @@ for rho, theta in lines1[:]:
         x2 = int(x0 - 1000 * (-b))
         y2 = int(y0 - 1000 * a)
         cv2.line(result, (x1, y1), (x2, y2), (255, 0, 0), 2)
+# print(len(houghlines))
 cv2.imshow('result', result)
 cv2.waitKey()
