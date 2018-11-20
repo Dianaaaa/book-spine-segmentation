@@ -60,6 +60,64 @@ def line_sifting(lines_list):
     return lines_final
 
 
+# 能量生长定义的点类
+class Point(object):
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def get_x(self):
+        return self.x
+
+    def get_y(self):
+        return self.y
+
+
+def get_seeds(lines):
+    seeds = []
+    i = 0
+    j = 1
+    while i < len(lines)-2:
+        x = lines[j][0] - lines[i][0]
+        y = img_height/2
+        seeds.append(Point(x, y))
+        i = i + 1
+        j = j + 1
+    return seeds
+
+
+def get_gray_diff(img, current_point, adjacent_point):
+    return abs(int(img[int(current_point.x)][int(current_point.y)]) - int(img[int(adjacent_point.x)][int(adjacent_point.y)]))
+
+
+def get_connects():
+    connects = [Point(-1, -1), Point(-1, 0), Point(-1, 1), Point(0, -1), Point(0, 1), Point(1, -1), Point(1, 0),
+                Point(1, 1)]
+    return connects
+
+
+def region_grow(img, seeds, thresh):
+    seed_mark = np.zeros(img.shape)
+    seed_stack = []
+    for seed in seeds:
+        seed_stack.append(seed)
+    mark = 1
+    connects = get_connects()
+    while len(seed_stack) > 0:
+        current_point = seed_stack.pop(0)
+        seed_mark[int(current_point.x)][int(current_point.y)] = mark
+        for connect in connects:
+            adjacent_x = current_point.x + connect.x
+            adjacent_y = current_point.y + connect.y
+            if adjacent_x < 0 or adjacent_y < 0 or adjacent_x >= img_width or adjacent_y >= img_height:
+                continue
+            gray_diff = get_gray_diff(img, current_point, Point(adjacent_x, adjacent_y))
+            if gray_diff < thresh and seed_mark[int(adjacent_x)][int(adjacent_y)] == 0:
+                seed_mark[int(adjacent_x)][int(adjacent_y)] = mark
+                seed_stack.append(Point(adjacent_x, adjacent_y))
+    return seed_mark
+
+
 def main():
     img_show, img = pre_process('book1.jpg')
     edges = cv2.Canny(img, 50, 150, apertureSize=3)
@@ -68,7 +126,11 @@ def main():
     # result = img.copy()
     houghlines = line_sifting(lines1)  # 存储并筛选检测出的垂直线
     draw_vertical(img_show, houghlines)
-    print(houghlines)
+    # print(houghlines)
+    seeds = get_seeds(houghlines)
+    binary_img = region_grow(img_show, seeds, 5)
+    cv2.imshow('binary_img', binary_img)
+
     cv2.imshow('result', img_show)
     cv2.waitKey()
 
