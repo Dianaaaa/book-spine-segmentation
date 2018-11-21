@@ -1,11 +1,12 @@
 import cv2
 import numpy as np
+import glob as gb
 
 img_width = 600
 img_height = 450
 
 
-#--------------Hough Transfrom---------
+# --------------Hough Transfrom---------
 # 图像预处理（缩放、高斯滤波）
 def pre_process(name):
     img = cv2.imread(name, 0)
@@ -40,26 +41,31 @@ def draw_vertical(img, lines):
     return new_img
 
 
-def line_sifting(lines_list):
-    lines = []
-    for rho, theta in lines_list[:]:
-        if (theta < (np.pi / 9.0)) or (theta > (17 * np.pi / 9.0)):  # 限制与y轴夹角小于20度的线
-            lines.append([rho, theta])
-    lines.sort()
+def line_reduce(lines):
     i = 0
     j = 0
     lines_final = []
-    while i < len(lines)-1:
-        if j >= len(lines)-1:
+    while i < len(lines) - 1:
+        if j >= len(lines) - 1:
             break
         j = i + 1
         lines_final.append(lines[i])
-        while j < len(lines)-1:
-            if lines[j][0]-lines[i][0] > 10:
+        while j < len(lines) - 1:
+            if lines[j][0] - lines[i][0] > 10:
                 i = j
                 break
             else:
-                j = j+1
+                j = j + 1
+    return lines_final
+
+
+def line_sifting(lines_list):
+    lines = []
+    for rho, theta in lines_list[:]:
+        if (theta < (np.pi / 6.0)) or (theta > (11 * np.pi / 6.0)) or ((theta > (5 *np.pi / 6.0)) and (theta < (7 * np.pi / 6.0))):  # 限制与y轴夹角小于30度的线
+            lines.append([rho, theta])
+    lines.sort()
+    lines_final = line_reduce(lines)
     return lines_final
 
 
@@ -81,7 +87,7 @@ def get_seeds(lines):
     i = 0
     j = 1
     while i < len(lines)-2:
-        y = int(lines[i][0] + (lines[j][0] - lines[i][0])/2)
+        y = int(lines[i][0] + (lines[j][0] - lines[i][0])/2) # 图片索引的x、y与我们理解的x、y相反
         x = int(img_height/2)
         seeds.append(Point(x, y))
         i = i + 1
@@ -121,6 +127,7 @@ def region_grow(img, seeds, thresh):
     return seed_mark
 
 
+# --------------image segmentation---------------
 def segmentation(img, lines):
     imgs = []
     i = 0
@@ -136,30 +143,47 @@ def segmentation(img, lines):
     return imgs
 
 
-def main():
-    img_gray, img = pre_process('book1.jpg')
+def seg_horizontal(img):
+    thresh = img.shape[1] - 10
     edges = cv2.Canny(img, 50, 150, apertureSize=3)
-    lines = cv2.HoughLines(edges, 1, np.pi/180, 140)  # 最后一个参数可调节，会影响直线检测的效果
-    lines1 = lines[:, 0, :]
-    # result = img.copy()
-    houghlines = line_sifting(lines1)  # 存储并筛选检测出的垂直线
-    img_show = draw_vertical(img_gray, houghlines)
-    # print(houghlines)
-
-    # seeds = get_seeds(houghlines)
-    # binary_img = region_grow(img_show, seeds, 15)
-    # cv2.imshow('binary_img', binary_img)
-
-    img_segmentation = segmentation(img_gray, houghlines)
-    i = 1
-    for img_s in img_segmentation:
-        string = '-' + str(i) + ' '
-        cv2.imshow(string, img_s)
-        i = i+1
-
-    cv2.imshow('result', img_show)
-    cv2.waitKey()
+    lines_pre = cv2.HoughLines(edges, 1, np.pi / 180, thresh)  # 最后一个参数可调节，会影响直线检测的效果
+    lines = lines_pre[:, 0, :]
+    lines_horizontal = []
+    for rho, theta in lines[:]:
+        if ((theta < (12 * np.pi / 18.0)) and (theta > (4 * np.pi / 18.0))) or ((theta > (22 * np.pi / 18.0)) and (theta < (32 * np.pi / 18.0))):
+            lines_horizontal.append([rho, theta])
+    lines_horizontal.sort()
+    lines_horizontal = line_reduce(lines_horizontal)
+    if len(lines_horizontal) == 0:
+        return img
+    y1 = int(lines_horizontal[0][0])
+    y2 = int(lines_horizontal[len(lines_horizontal)-1][0])
+    book_img = img[y1:y2, 0:img_width]
+    return book_img
 
 
+def main():
+    img_path = gb.glob("image/\\*.jpg")
+    for path in img_path:
+        img_gray, img = pre_process(path)
+        edges = cv2.Canny(img, 50, 150, apertureSize=3)
+        lines = cv2.HoughLines(edges, 1, np.pi/180, 160)  # 最后一个参数可调节，会影响直线检测的效果
+        lines1 = lines[:, 0, :]
+        houghlines = line_sifting(lines1)  # 存储并筛选检测出的垂直线
+        img_show = draw_vertical(img_gray, houghlines)
+        img_segmentation = segmentation(img_gray, houghlines)
+        i = 0
+        for img_s in img_segmentation:
+            if img_s.shape[0] == 0:
+                print(i)
+            # img_s = seg_horizontal(img_s)
+            str1 = path[6:]
+            str1 = str1[:-4]
+            string = 'results/' + str1 + "-" + str(i) + '.jpg'
+            print("Write " + string)
+            cv2.imwrite(string, img_s)  # 保持切割后的图像
+            i = i+1
+        cv2.imshow("result", img_show)
+        cv2.waitKey()
 main()
 
