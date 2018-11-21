@@ -5,6 +5,7 @@ img_width = 600
 img_height = 450
 
 
+#--------------Hough Transfrom---------
 # 图像预处理（缩放、高斯滤波）
 def pre_process(name):
     img = cv2.imread(name, 0)
@@ -60,7 +61,7 @@ def line_sifting(lines_list):
     return lines_final
 
 
-# 能量生长定义的点类
+# ------------Region Grow---------------
 class Point(object):
     def __init__(self, x, y):
         self.x = x
@@ -78,8 +79,8 @@ def get_seeds(lines):
     i = 0
     j = 1
     while i < len(lines)-2:
-        x = lines[j][0] - lines[i][0]
-        y = img_height/2
+        y = int(lines[i][0] + (lines[j][0] - lines[i][0])/2)
+        x = int(img_height/2)
         seeds.append(Point(x, y))
         i = i + 1
         j = j + 1
@@ -87,7 +88,7 @@ def get_seeds(lines):
 
 
 def get_gray_diff(img, current_point, adjacent_point):
-    return abs(int(img[int(current_point.x)][int(current_point.y)]) - int(img[int(adjacent_point.x)][int(adjacent_point.y)]))
+    return abs(int(img[current_point.x][current_point.y]) - int(img[adjacent_point.x][adjacent_point.y]))
 
 
 def get_connects():
@@ -105,18 +106,17 @@ def region_grow(img, seeds, thresh):
     connects = get_connects()
     while len(seed_stack) > 0:
         current_point = seed_stack.pop(0)
-        seed_mark[int(current_point.x)][int(current_point.y)] = mark
+        seed_mark[current_point.x][current_point.y] = mark
         for connect in connects:
-            adjacent_x = current_point.x + connect.x
-            adjacent_y = current_point.y + connect.y
-            if adjacent_x < 0 or adjacent_y < 0 or adjacent_x >= img_width or adjacent_y >= img_height:
+            adjacent_x = int(current_point.x + connect.x)
+            adjacent_y = int(current_point.y + connect.y)
+            if adjacent_x < 0 or adjacent_y < 0 or adjacent_x >= img_height or adjacent_y >= img_width:
                 continue
             gray_diff = get_gray_diff(img, current_point, Point(adjacent_x, adjacent_y))
-            if gray_diff < thresh and seed_mark[int(adjacent_x)][int(adjacent_y)] == 0:
-                seed_mark[int(adjacent_x)][int(adjacent_y)] = mark
+            if gray_diff < thresh and seed_mark[adjacent_x][adjacent_y] == 0:
+                seed_mark[adjacent_x][adjacent_y] = mark
                 seed_stack.append(Point(adjacent_x, adjacent_y))
     return seed_mark
-
 
 def main():
     img_show, img = pre_process('book1.jpg')
@@ -128,7 +128,7 @@ def main():
     draw_vertical(img_show, houghlines)
     # print(houghlines)
     seeds = get_seeds(houghlines)
-    binary_img = region_grow(img_show, seeds, 5)
+    binary_img = region_grow(img_show, seeds, 15)
     cv2.imshow('binary_img', binary_img)
 
     cv2.imshow('result', img_show)
