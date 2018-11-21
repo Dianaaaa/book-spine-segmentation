@@ -10,11 +10,12 @@ img_height = 450
 def pre_process(name):
     img = cv2.imread(name, 0)
     img_resized = cv2.resize(img, (img_width, img_height))
-    img_gau = cv2.GaussianBlur(img_resized, (3, 3), 0)
-    return img_resized, img_gau
+    img_blur = cv2.GaussianBlur(img_resized, (3, 3), 0)
+    return img_resized, img_blur
 
 
 def draw(img, lines):
+    new_img = img.copy()
     for rho, theta in lines[:]:
         a = np.cos(theta)
         b = np.sin(theta)
@@ -24,18 +25,19 @@ def draw(img, lines):
         y1 = int(y0 + 1000 * a)
         x2 = int(x0 - 1000 * (-b))
         y2 = int(y0 - 1000 * a)
-        cv2.line(img, (x1, y1), (x2, y2), (255, 0, 0), 2)
-    return 0
+        cv2.line(new_img, (x1, y1), (x2, y2), (255, 0, 0), 2)
+    return new_img
 
 
 def draw_vertical(img, lines):
+    new_img = img.copy()
     for rho, theta in lines[:]:
         x1 = rho
         x2 = rho
         y1 = 0
         y2 = img_width
-        cv2.line(img, (x1, y1), (x2, y2), (255, 0, 0), 2)
-    return 0
+        cv2.line(new_img, (x1, y1), (x2, y2), (255, 0, 0), 2)
+    return new_img
 
 
 def line_sifting(lines_list):
@@ -118,18 +120,42 @@ def region_grow(img, seeds, thresh):
                 seed_stack.append(Point(adjacent_x, adjacent_y))
     return seed_mark
 
+
+def segmentation(img, lines):
+    imgs = []
+    i = 0
+    j = 1
+    while i < len(lines) - 2:
+        x1 = int(lines[i][0])
+        x2 = int(lines[j][0])
+        book_img = img[0:img_height, x1:x2]
+        imgs.append(book_img)
+        i = i + 1
+        j = j + 1
+
+    return imgs
+
+
 def main():
-    img_show, img = pre_process('book1.jpg')
+    img_gray, img = pre_process('book1.jpg')
     edges = cv2.Canny(img, 50, 150, apertureSize=3)
     lines = cv2.HoughLines(edges, 1, np.pi/180, 140)  # 最后一个参数可调节，会影响直线检测的效果
     lines1 = lines[:, 0, :]
     # result = img.copy()
     houghlines = line_sifting(lines1)  # 存储并筛选检测出的垂直线
-    draw_vertical(img_show, houghlines)
+    img_show = draw_vertical(img_gray, houghlines)
     # print(houghlines)
-    seeds = get_seeds(houghlines)
-    binary_img = region_grow(img_show, seeds, 15)
-    cv2.imshow('binary_img', binary_img)
+
+    # seeds = get_seeds(houghlines)
+    # binary_img = region_grow(img_show, seeds, 15)
+    # cv2.imshow('binary_img', binary_img)
+
+    img_segmentation = segmentation(img_gray, houghlines)
+    i = 1
+    for img_s in img_segmentation:
+        string = '-' + str(i) + ' '
+        cv2.imshow(string, img_s)
+        i = i+1
 
     cv2.imshow('result', img_show)
     cv2.waitKey()
